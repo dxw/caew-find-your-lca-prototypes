@@ -35,7 +35,7 @@ module FinderPrototypes
           }
         },
         output_serialization: {
-          csv: {}
+          json: {}
         }
       }
     end
@@ -61,7 +61,9 @@ module FinderPrototypes
       #  https://datatracker.ietf.org/doc/html/rfc4180
       #  "Fields containing line breaks (CRLF), double quotes, and commas
       #  should be enclosed in double-quotes."
-      row_data = CSV.parse(resp2.payload.first.payload.readline)
+      result = resp2.payload.to_a.detect{|data| data.event_type == :records}.payload.readline
+      # puts JSON.parse(result)
+      # row_data = CSV.parse(resp2.payload.first.payload.readline)
     end
   end
 end
