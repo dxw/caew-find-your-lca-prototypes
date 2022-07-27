@@ -8,13 +8,28 @@ module FinderPrototypes
 
     def find_postcode_params(postcode='BS4 3JB')
       {
-        bucket:"caew-find-lca-test",
-        # The Glue spits out 2 files and depending on the postcode you might
-        # get a miss or a match and need to check the other file..
-        # run-S3bucket_node3-2-part-block-0-r-00002-gzip.parquet
-        key: "run-S3bucket_node3-2-part-block-0-r-00001-gzip.parquet",
+        bucket: "caew-find-lca-test",
+        key: "geolocations/parquet/renamed/data.parquet",
         expression_type: 'SQL',
-        expression: "SELECT * FROM S3Object WHERE POSTCODE='#{postcode}'",
+        expression: "SELECT * FROM S3Object WHERE postcode__c = '#{postcode}'",
+        input_serialization: {
+          compression_type: 'NONE',
+          parquet: {
+          }
+        },
+        output_serialization: {
+          json: {
+          }
+        }
+      }
+    end
+
+    def find_local_authority_params(id)
+      {
+        bucket: "caew-find-lca-test",
+        key: "local-authorities/parquet/renamed/data.parquet",
+        expression_type: 'SQL',
+        expression: "SELECT * FROM S3Object WHERE id = '#{id}'",
         input_serialization: {
           compression_type: 'NONE',
           parquet: {
@@ -29,10 +44,10 @@ module FinderPrototypes
 
     def find_office_params(id='0014K00000b5dOTQAY')
       {
-        bucket:"caew-find-lca-test",
-        key: "run-S3bucket_node3-2-part-block-0-r-00000-snappy.parquet",
+        bucket: "caew-find-lca-test",
+        key: "offices/parquet/renamed/data.parquet",
         expression_type: 'SQL',
-        expression: "SELECT * FROM S3Object WHERE Id='#{id}'",
+        expression: "SELECT * FROM S3Object WHERE Local_Authority__c='#{id}'",
         input_serialization: {
           compression_type: 'NONE',
           parquet: {
@@ -51,15 +66,23 @@ module FinderPrototypes
       end
       resp = @client.select_object_content(find_postcode_params)
       result = resp.payload.to_a.detect{|data| data.event_type == :records}.payload.readline
-      # puts JSON.parse(result)
-
+      json_result = JSON.parse(result)
+      local_authority_id = json_result["local_authority__c"]
 
       Benchmark.bm do |x|
-        x.report("Query office Parquet:") { @client.select_object_content(find_office_params) }
+        x.report("Query local authority Parquet:") { @client.select_object_content(find_local_authority_params(local_authority_id)) }
       end
-      resp = @client.select_object_content(find_office_params)
+      resp = @client.select_object_content(find_local_authority_params(local_authority_id))
       result = resp.payload.to_a.detect{|data| data.event_type == :records}.payload.readline
-      # puts JSON.parse(result)
+      json_result = JSON.parse(result)
+      # TODO: Find out what data is needed from local authorities
+
+      Benchmark.bm do |x|
+        x.report("Query office Parquet:") { @client.select_object_content(find_office_params(local_authority_id)) }
+      end
+      resp = @client.select_object_content(find_office_params(local_authority_id))
+      result = resp.payload.to_a.detect{|data| data.event_type == :records}.payload.readline
+      puts JSON.parse(result)
     end
   end
 end
